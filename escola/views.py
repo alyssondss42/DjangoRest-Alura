@@ -3,9 +3,10 @@ from django.http import JsonResponse
 from rest_framework import viewsets, generics
 from escola.models import Aluno, Curso, Matricula
 from .serializer import AlunoSerializer, CursoSerializer, MatriculaSerializer, \
-    ListaMatriculasAlunoSerializer, ListaAlunosMatriculadosSerializer
-from rest_framework.authentication import BasicAuthentication
-from rest_framework.permissions import IsAuthenticated
+    ListaMatriculasAlunoSerializer, ListaAlunosMatriculadosSerializer, AlunoSerializerV2
+from rest_framework.response import Response
+import rest_framework.status as status
+
 
 # Create your views here.
 
@@ -13,25 +14,34 @@ from rest_framework.permissions import IsAuthenticated
 class AlunosViewSet(viewsets.ModelViewSet):
     """Exibindo todos os alunos e alunas"""
     queryset = Aluno.objects.all()
-    serializer_class = AlunoSerializer
-    authentication_classes = [BasicAuthentication]
-    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.version == 'v2':
+            return AlunoSerializerV2
+        else:
+            return AlunoSerializer
 
 
 class CursosViewSet(viewsets.ModelViewSet):
     """Exibindo todos os cursos"""
     queryset = Curso.objects.all()
     serializer_class = CursoSerializer
-    authentication_classes = [BasicAuthentication]
-    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            response = Response(serializer.data, status=status.HTTP_201_CREATED)
+            id = str(serializer.data['id'])
+            response['Location'] = request.build_absolute_uri() + id
+            return response
 
 
 class MatriculasViewSet(viewsets.ModelViewSet):
     """Listando todas as matriculas"""
     queryset = Matricula.objects.all()
     serializer_class = MatriculaSerializer
-    authentication_classes = [BasicAuthentication]
-    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'put', 'path']
 
 
 class ListaMatriculasAluno(generics.ListAPIView):
@@ -41,8 +51,6 @@ class ListaMatriculasAluno(generics.ListAPIView):
         return queryset
 
     serializer_class = ListaMatriculasAlunoSerializer
-    authentication_classes = [BasicAuthentication]
-    permission_classes = [IsAuthenticated]
 
 
 class ListaAlunosMatriculados(generics.ListAPIView):
@@ -53,5 +61,3 @@ class ListaAlunosMatriculados(generics.ListAPIView):
         return queryset
 
     serializer_class = ListaAlunosMatriculadosSerializer
-    authentication_classes = [BasicAuthentication]
-    permission_classes = [IsAuthenticated]
